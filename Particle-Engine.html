@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>粒子系统</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+		<link rel="stylesheet" href="css/base.css" />
+	</head>
+	<body>
+		<script src="js/Three.js"></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/THREEx.KeyboardState.js"></script>
+		<script src="js/THREEx.FullScreen.js"></script>
+		<script src="js/THREEx.WindowResize.js"></script>
+
+		<script src="js/ParticleEngine.js"></script>
+		<script src="js/ParticleEngineExamples.js"></script>
+
+		<script type="text/javascript" src="js/DAT.GUI.min.js"></script>
+
+		<div id="ThreeJS" style="position: absolute; left: 0px; top: 0px"></div>
+		<script>
+			var container, scene, camera, renderer;
+			var keyboard = new THREEx.KeyboardState();
+			var clock = new THREE.Clock();
+
+			init();
+			animate();
+
+			function init() {
+				scene = new THREE.Scene();
+				var SCREEN_WIDTH = window.innerWidth,
+					SCREEN_HEIGHT = window.innerHeight;
+				var VIEW_ANGLE = 45, //视角
+					ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, //长宽比
+					NEAR = 2, //近平面
+					FAR = 5000; //远平面
+
+				camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR); //透视相机
+				scene.add(camera);
+				camera.position.set(0, 150, 400);
+				camera.lookAt(scene.position);
+
+				if (Detector.webgl) renderer = new THREE.WebGLRenderer({ antialias: true }); //抗锯齿
+				else renderer = new THREE.CanvasRenderer();
+				renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+				container = document.getElementById("ThreeJS");
+				container.appendChild(renderer.domElement);
+				THREEx.WindowResize(renderer, camera);
+				THREEx.FullScreen.bindKey({ charCode: "m".charCodeAt(0) }); //按m键全屏
+
+				var light = new THREE.PointLight(0xffffff);
+				light.position.set(0, 250, 0);
+				scene.add(light);
+
+				var floorTexture = new THREE.ImageUtils.loadTexture("images/checkerboard.jpg"); //加载纹理
+				floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; //设置纹理重复属性
+				floorTexture.repeat.set(10, 10); //设置纹理重复次数
+				var floorMaterial = new THREE.MeshBasicMaterial({ color: 0x444444, map: floorTexture, side: THREE.DoubleSide }); //side: THREE.DoubleSide设置为双面材质
+				var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10); //参数：长，宽，长分段数，宽分段数
+				var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+				floor.position.y = -10.5;
+				floor.rotation.x = Math.PI / 2;
+				scene.add(floor);
+
+				var skyBoxGeometry = new THREE.CubeGeometry(4000, 4000, 4000); //参数：长，宽，高
+				var skyBoxMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide }); //side: THREE.BackSide设置为背面材质
+				var skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial); //创建一个网格对象
+				scene.add(skyBox);
+
+				this.engine = new ParticleEngine();
+				engine.setValues(Examples.fountain);
+				engine.initialize();
+
+				var currentExample = Examples.fountain;
+
+				gui = new dat.GUI();
+				parameters = {
+					fountain: function () {
+						currentExample = Examples.fountain;
+						restartEngine(Examples.fountain);
+					},
+					fireflies: function () {
+						currentExample = Examples.fireflies;
+						restartEngine(Examples.fireflies);
+					},
+					candle: function () {
+						currentExample = Examples.candle;
+						restartEngine(Examples.candle);
+					},
+					rain: function () {
+						currentExample = Examples.rain;
+						restartEngine(Examples.rain);
+					},
+					snow: function () {
+						currentExample = Examples.snow;
+						restartEngine(Examples.snow);
+					},
+					firework: function () {
+						currentExample = Examples.firework;
+						restartEngine(Examples.firework);
+					},
+				};
+
+				gui.add(parameters, "fountain").name("星星喷泉");
+				gui.add(parameters, "fireflies").name("萤火虫");
+				gui.add(parameters, "candle").name("火束");
+				gui.add(parameters, "rain").name("雨");
+				gui.add(parameters, "snow").name("雪");
+				gui.add(parameters, "firework").name("烟花");
+
+				gui
+					.add(currentExample, "particlesPerSecond", 10, 2000)
+					.name("粒子数量")
+					.onChange(function (value) {
+						currentExample.particlesPerSecond = value;
+						restartEngine(currentExample);
+					});
+
+				gui
+					.add(currentExample, "particleDeathAge", 0.2, 5)
+					.name("粒子死亡时间")
+					.onChange(function (value) {
+						currentExample.particleDeathAge = value;
+						restartEngine(currentExample);
+					});
+
+				gui
+					.add(currentExample, "emitterDeathAge", 1, 60)
+					.name("发射器死亡时间")
+					.onChange(function (value) {
+						currentExample.emitterDeathAge = value;
+						restartEngine(currentExample);
+					});
+
+				gui.open();
+			}
+
+			function animate() {
+				requestAnimationFrame(animate);
+				render();
+				update();
+			}
+
+			function restartEngine(parameters) {
+				resetCamera();
+
+				engine.destroy();
+				engine = new ParticleEngine();
+				engine.setValues(parameters);
+				engine.initialize();
+			}
+
+			function resetCamera() {
+				var SCREEN_WIDTH = window.innerWidth,
+					SCREEN_HEIGHT = window.innerHeight;
+				var VIEW_ANGLE = 45,
+					ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT,
+					NEAR = 2,
+					FAR = 20000;
+				camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+				camera.position.set(0, 150, 400);
+				camera.lookAt(scene.position); //相机焦点
+				scene.add(camera);
+
+				THREEx.WindowResize(renderer, camera);
+			}
+
+			function update() {
+				var dt = clock.getDelta(); //获取两帧之间的时间间隔
+				engine.update(dt * 0.5); //更新粒子系统
+			}
+
+			function render() {
+				renderer.render(scene, camera);
+			}
+		</script>
+	</body>
+</html>
